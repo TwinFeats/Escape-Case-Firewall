@@ -2,7 +2,7 @@
 #include <ButtonDebounce.h>
 #include <NeoPixelBrightnessBus.h>
 #include <arduino-timer.h>
-#define PJON_MAX_PACKETS 2
+#define PJON_MAX_PACKETS 4
 #define PJON_PACKET_MAX_LENGTH 33
 #include <PJONSoftwareBitBang.h>
 #include "../../Escape Room v2 Master/src/tracks.h"
@@ -106,8 +106,6 @@ struct CLUE {
   uint8_t incorrect;
 };
 
-int lastBrightness = 0;
-
 boolean isMasterMindRunning = true;
 NeoPixelBrightnessBus<NeoRgbFeature, Neo400KbpsMethod> mastermindLights(
     5, PIN_LEDS);
@@ -147,6 +145,10 @@ void mastermindComplete() {
   line2[0] = 0;
   sprintf(line1, "Firewall down!", "%-16s");
   sendLcd(line1,line2);
+  sendMp3(TRACK_MODEM_ACQUIRED);
+  send((uint8_t *)"D", 1);
+  activated = false;
+  digitalWrite(PIN_POWER_LIGHT, LOW);
 }
 
 /* updates clue */
@@ -249,8 +251,7 @@ void mmEnterPressed(const int state) {
     evaluateGuess();
     showClue();
     if (clue.correct == 5) {
-      sendMp3(TRACK_MODEM_ACQUIRED);
-      send((uint8_t *)"D", 1);
+      mastermindComplete();
     }
   }
 }
