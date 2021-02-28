@@ -7,14 +7,14 @@
 #include <PJONSoftwareBitBang.h>
 #include "../../Escape Room v2 Master/src/tracks.h"
 
-#define PIN_COLOR1        1
-#define PIN_COLOR2        2
-#define PIN_COLOR3        3
-#define PIN_COLOR4        4
-#define PIN_COLOR5        5
-#define PIN_ENTER         6
-#define PIN_LEDS          7
-#define PIN_POWER_LIGHT   8
+#define PIN_COLOR1        2
+#define PIN_COLOR2        3
+#define PIN_COLOR3        4
+#define PIN_COLOR4        5
+#define PIN_COLOR5        6
+#define PIN_ENTER         7
+#define PIN_LEDS          8
+#define PIN_POWER_LIGHT   9
 #define PIN_COMM          13
 
 NeoGamma<NeoGammaTableMethod> colorGamma;
@@ -130,9 +130,15 @@ ButtonDebounce mm5(PIN_COLOR5, 100);
 ButtonDebounce mmEnter(PIN_ENTER, 100);
 
 void initCode() {
+  uint8_t msg[9];
+  msg[0] = 'C';
+  uint8_t r;
   for (uint8_t i = 0; i < 5; i++) {
-    code[i] = colors[random(8)];
+    r = random(8);
+    code[i] = colors[r];
+    msg[i+1] = r;
   }
+  bus.send(12, msg, 6);
 }
 
 boolean compareRGB(RgbColor color1, RgbColor color2) {
@@ -143,7 +149,7 @@ void mastermindComplete() {
   char line1[17], line2[17];
   line1[0] = 0;
   line2[0] = 0;
-  sprintf(line1, "Firewall down!", "%-16s");
+  sprintf(line1, "%-16s", "Firewall down!");
   sendLcd(line1,line2);
   sendMp3(TRACK_MODEM_ACQUIRED);
   send((uint8_t *)"D", 1);
