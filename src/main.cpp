@@ -17,6 +17,8 @@
 #define PIN_POWER_LIGHT   9
 #define PIN_COMM          13
 
+void convertColorsToNames(RgbColor g[5]);
+
 NeoGamma<NeoGammaTableMethod> colorGamma;
 
 RgbColor white(255, 255, 255);
@@ -38,14 +40,43 @@ RgbColor orange = colorGamma.Correct(RgbColor(255, 165, 0));
 RgbColor turquoise = colorGamma.Correct(RgbColor(175, 238, 238));
 RgbColor plum = colorGamma.Correct(RgbColor(221, 160, 221));
 
+struct CLUE {
+  uint8_t correct;
+  uint8_t incorrect;
+};
+
+boolean isMasterMindRunning = true;
+NeoPixelBrightnessBus<NeoRgbFeature, Neo400KbpsMethod> mastermindLights(
+    5, PIN_LEDS);
+
+RgbColor colors[8] = {white, red, green, blue, yellow, cyan, pink, black};
+char colorNames[8] = {'W', 'R', 'G', 'B', 'Y', 'C', 'P', 'E'};
+
+RgbColor code[5], guess[5] = {black, black, black, black, black};
+RgbColor guessCopy[5], codeCopy[5];
+RgbColor bad(1, 1, 1), bad2(2, 2, 2);
+
+uint8_t mmLights[5] = {7, 7, 7, 7, 7};
+
+CLUE clue;
+char guessColorNames[6] = {'E', 'E', 'E', 'E', 'E', '\0'};
+
 
 boolean activated = false;
 
 PJON<SoftwareBitBang> bus(12);
 
+void sendLcd(const char *line1, const char *line2);
+
 void send(uint8_t *msg, uint8_t len) {
   bus.send(1, msg, len);
-  bus.update();
+  while (bus.update()) {};//wait for send to be completed
+}
+
+void send(const char *msg, int len) {
+  uint8_t buf[35];
+  memcpy(buf, msg, len);
+  send(buf, len);
 }
 
 void error_handler(uint8_t code, uint16_t data, void *custom_pointer) {
@@ -59,14 +90,18 @@ void commReceive(uint8_t *data, uint16_t len, const PJON_Packet_Info &info) {
   if (data[0] == 'A') {
     activated = true;
     digitalWrite(PIN_POWER_LIGHT, HIGH);
+    convertColorsToNames(code);
+    sendLcd("Firewall", guessColorNames);
   } else if (data[0] == 'W') {  //player has won
 
   } else if (data[0] == 'L') {  //player has lost
 
+  } else if (data[0] == 'B') {  //brightness
+    mastermindLights.SetBrightness(data[1]);
   }
 }
 
-void sendLcd(char *line1, char *line2) {
+void sendLcd(const char *line1, const char *line2) {
   uint8_t msg[35];
   msg[0] = 'L';
   strncpy((char *)&msg[1], line1, 17);
@@ -103,26 +138,6 @@ void initComm() {
 
 
 /* --------------------- MASTERMIND ---------------------------*/
-struct CLUE {
-  uint8_t correct;
-  uint8_t incorrect;
-};
-
-boolean isMasterMindRunning = true;
-NeoPixelBrightnessBus<NeoRgbFeature, Neo400KbpsMethod> mastermindLights(
-    5, PIN_LEDS);
-
-RgbColor colors[8] = {white, red, green, blue, yellow, cyan, pink, black};
-char colorNames[8] = {'W', 'R', 'G', 'B', 'Y', 'C', 'P', 'E'};
-
-RgbColor code[5], guess[5] = {black, black, black, black, black};
-RgbColor guessCopy[5], codeCopy[5];
-RgbColor bad(1, 1, 1), bad2(2, 2, 2);
-
-uint8_t mmLights[5] = {7, 7, 7, 7, 7};
-
-CLUE clue;
-char guessColorNames[6] = {'E', 'E', 'E', 'E', 'E', '\0'};
 
 ButtonDebounce mm1(PIN_COLOR1, 100);
 ButtonDebounce mm2(PIN_COLOR2, 100);
@@ -148,12 +163,7 @@ boolean compareRGB(RgbColor color1, RgbColor color2) {
 }
 
 void mastermindComplete() {
-  char line1[17], line2[17];
-  line1[0] = 0;
-  line2[0] = 0;
-  sprintf(line1, "%-16s", "Firewall down!");
-  sendLcd(line1,line2);
-  sendMp3(TRACK_MODEM_ACQUIRED);
+  sendMp3(TRACK_FIREWALL_BREECHED);
   send((uint8_t *)"D", 1);
   activated = false;
   digitalWrite(PIN_POWER_LIGHT, LOW);
@@ -274,6 +284,7 @@ void initMasterMind() {
 
   mastermindLights.Begin();
   mastermindLights.Show();  // init lights off
+  mastermindLights.SetBrightness(128);
   initCode();
   convertColorsToNames(code);
   mm1.setCallback(mm1Pressed);
