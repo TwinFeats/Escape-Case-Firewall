@@ -91,13 +91,20 @@ void commReceive(uint8_t *data, uint16_t len, const PJON_Packet_Info &info) {
     activated = true;
     digitalWrite(PIN_POWER_LIGHT, HIGH);
     convertColorsToNames(code);
-    sendLcd("Firewall", guessColorNames);
+    uint8_t msg[6];
+    msg[0] = 'C';
+    for (int i=0;i<5;i++) {
+      msg[i+1] = guessColorNames[4-i];  //solution is backwards, how original
+    }
+    bus.send(COMM_ID_CONTROL_ROOM, msg, 6);
+    while (bus.update()) {};//wait for send to be completed
   } else if (data[0] == 'W') {  //player has won
 
   } else if (data[0] == 'L') {  //player has lost
 
   } else if (data[0] == 'B') {  //brightness
     mastermindLights.SetBrightness(data[1]);
+    mastermindLights.Show();
   }
 }
 
@@ -297,6 +304,22 @@ void initMasterMind() {
 
 /* ------------------- END MASTERMIND------------------- */
 
+void startup() {
+  delay(8000*1 + 1000);  //wait for modem panel
+  digitalWrite(PIN_POWER_LIGHT, HIGH);
+
+  for (int i=0;i<5;i++) {
+    mastermindLights.SetPixelColor(i, red);
+    mastermindLights.Show();
+    delay(500);
+    mastermindLights.SetPixelColor(i, black);
+    mastermindLights.Show();
+  }
+  digitalWrite(PIN_POWER_LIGHT, LOW);
+  convertColorsToNames(code);
+  sendLcd("Firewall",guessColorNames);
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Starting");
@@ -306,6 +329,7 @@ void setup() {
   delay(2000);
   initComm();
   initMasterMind();
+  startup();
 }
 
 void loop() {
